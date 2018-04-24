@@ -47,7 +47,9 @@ class goget():
         # Retry 50 times each time looping through the proxy dict and if all banned waiting for the ban time until they unban
         for n in range(50):
             try:
+                # get a proxy
                 proxy = self.__select_proxy()
+                # if all are banned be prepped to wait
                 proxy = self.__proxy_wait() if list(proxy.values())[0] == 0 else proxy
                 a = r.get(url, proxies=proxy)
                 if a.status_code != 200:
