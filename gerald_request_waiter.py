@@ -70,7 +70,15 @@ class goget():
         return self.make_request(url)
 
     def requests_per_hour(self, num, url):
-        pass
+        a = self.make_request(url) if self.last_request == None else 0
+        if a != 0:
+            self.last_request = datetime.datetime.now()
+            return a
+        # Turn the seconds into a split allowance per hour e.g. 200 requests an hour is 1 every 18 seconds
+        time_to_wait = 3600 / num
+        time.sleep(time_to_wait)
+        # Request can be made so make it & return
+        return self.make_request(url)
 
     def requests_per_sec(self, num, url):
         pass
@@ -79,3 +87,6 @@ class goget():
 c = goget(proxies=['95.154.216.236:80'], protocol="http")
 a = c.wait_between_requests(2,'https://adaptworldwide.com')
 b = c.wait_between_requests(5,'https://adaptworldwide.com')
+c = c.requests_per_hour(500,'https://adaptworldwide.com')
+
+print(a.status_code, b.status_code,c.content)
