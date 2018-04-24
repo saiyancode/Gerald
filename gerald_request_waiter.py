@@ -4,13 +4,16 @@ from random import choice
 import time
 
 class goget():
-    def __init__(self, proxies):
+    def __init__(self, proxies=False, protocol="http"):
         self.start_time = datetime.datetime.now()
         self.last_request = None
-        self.proxies = self.__proxy_dict(proxies) if proxies != False else 0
-        self.ban_time = 10
+        self.proxies = self.__proxy_dict(proxies)
+        self.ban_time = 5
+        self.protocol = protocol
 
     def __proxy_dict(self,proxies):
+        if proxies == False:
+            return 0
         pro = {}
         for proxy in proxies:
             pro[proxy] = (True,0)
@@ -20,17 +23,40 @@ class goget():
         # Update the proxy dict if enough time has passed for the proxy to be tried again
         for proxy, value in self.proxies.items():
             if value[0] != True:
-                if datetime.datetime.now() - value[0] >= datetime.timedelta(seconds=self.ban_time * value[1]):
+                if datetime.datetime.now() - value[0] >= datetime.timedelta(seconds=self.ban_time):
                     self.proxies[proxy] = (True,value[1])
-        return choice([key if value[0] != False else 0 for key, value in self.proxies.items()])
+
+        # Return the proxy structure that's according to the set protocol
+        return {self.protocol: choice([key if value[0] == True else 0 for key, value in self.proxies.items()])}
+
+    def __proxy_wait(self):
+        # If all proxies are banned wait to till there is an unbanned proxy
+        min_wait = self.ban_time
+        for proxy, value in self.proxies.items():
+            if value[0] != True:
+                time_to_wait = (datetime.datetime.now() + datetime.timedelta(seconds=min_wait)) - value[0]
+                min_wait = time_to_wait.seconds if min_wait > time_to_wait.seconds else min_wait
+        time.sleep(min_wait+1)
+        return self.__select_proxy()
 
     def make_request(self,url):
         # Pull a proxy from the dict & run it - if request isn't 200 pull another
-        proxy = self.__select_proxy()
-        a = r.get(url)
-        if a.status_code == 403:
-            self.proxies[proxy] = (datetime.datetime.now(),self.proxies[proxy][1]+1)
-        return a
+        if self.proxies == False:
+            return r.get(url)
+
+        # Retry 50 times each time looping through the proxy dict and if all banned waiting for the ban time until they unban
+        for n in range(50):
+            try:
+                proxy = self.__select_proxy()
+                proxy = self.__proxy_wait() if list(proxy.values())[0] == 0 else proxy
+                a = r.get(url, proxies=proxy)
+                if a.status_code != 200:
+                    self.proxies[list(proxy.values())[0]] = (datetime.datetime.now(),self.proxies[list(proxy.values())[0]][1]+1)
+                else:
+                    return a
+            except Exception as e:
+                print(e)
+                print("Skipping due to connection error")
 
     def wait_between_requests(self, wait, url):
         # Waits for set time between requests
@@ -50,7 +76,6 @@ class goget():
         pass
 
 
-c = goget(proxies=['82.145.57.93'])
-a = c.wait_between_requests(10,'https://www.google.co.uk')
-time.sleep(1)
+c = goget(proxies=['95.154.216.236:80'], protocol="http")
+a = c.wait_between_requests(2,'https://adaptworldwide.com')
 b = c.wait_between_requests(5,'https://adaptworldwide.com')
